@@ -7,7 +7,6 @@ import {
   ShieldCheck,
   ScrollText,
   BarChart3,
-  Leaf,
   X,
   Menu,
   LogOut,
@@ -34,18 +33,19 @@ export function Sidebar() {
   const navContent = (
     <div className="flex flex-col h-full">
       {/* Logo */}
-      <Link href="/" className="flex items-center gap-3 px-6 py-6">
-        <div className="relative">
-          <div className="w-9 h-9 rounded-lg gradient-emerald flex items-center justify-center">
-            <Leaf className="h-5 w-5 text-white" />
-          </div>
-          <div className="absolute inset-0 w-9 h-9 rounded-lg gradient-emerald blur-lg opacity-40" />
-        </div>
-        <div>
-          <span className="text-lg font-bold tracking-tight text-white">
-            Verda<span className="text-emerald-400">Chain</span>
-          </span>
-        </div>
+      <Link href="/" className="flex items-center px-4 py-6">
+        <svg width="220" height="50" viewBox="0 0 680 200" xmlns="http://www.w3.org/2000/svg">
+          <g transform="translate(80, 100)">
+            <polygon points="0,-52 45,-26 45,26 0,52 -45,26 -45,-26" fill="none" stroke="#10b981" strokeWidth="2.5"/>
+            <polygon points="0,-38 33,-19 33,19 0,38 -33,19 -33,-19" fill="none" stroke="#10b981" strokeWidth="1" opacity="0.4"/>
+            <rect x="-28" y="-7" width="16" height="14" rx="7" fill="none" stroke="#10b981" strokeWidth="2.2"/>
+            <rect x="12" y="-7" width="16" height="14" rx="7" fill="none" stroke="#10b981" strokeWidth="2.2"/>
+            <line x1="-12" y1="0" x2="12" y2="0" stroke="#10b981" strokeWidth="2.2"/>
+            <polyline points="-10,-22 0,-10 10,-22" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </g>
+          <text x="145" y="112" fontFamily="system-ui, sans-serif" fontSize="48" fontWeight="700" letterSpacing="2" fill="#10b981">VERDA</text>
+          <text x="310" y="112" fontFamily="system-ui, sans-serif" fontSize="48" fontWeight="300" letterSpacing="2" fill="white">CHAIN</text>
+        </svg>
       </Link>
 
       {/* Separator */}
@@ -96,7 +96,7 @@ export function Sidebar() {
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             <span className="text-xs text-emerald-400 font-medium">
-              Ethereum Mainnet
+              Sepolia Testnet
             </span>
           </div>
         </div>
@@ -137,7 +137,7 @@ export function Sidebar() {
         initial={{ x: -280 }}
         animate={{ x: mobileOpen ? 0 : -280 }}
         transition={{ type: "spring", bounce: 0, duration: 0.4 }}
-        className="fixed top-0 left-0 bottom-0 w-[260px] z-50 lg:hidden bg-[#0a0e0a] border-r border-white/5"
+        className="fixed top-0 left-0 bottom-0 w-[260px] z-50 lg:hidden bg-sidebar border-r border-white/5"
       >
         <button
           onClick={() => setMobileOpen(false)}
@@ -149,7 +149,7 @@ export function Sidebar() {
       </motion.aside>
 
       {/* Desktop sidebar */}
-      <aside className="hidden lg:flex w-[260px] flex-shrink-0 flex-col bg-[#0a0e0a]/80 border-r border-white/5 backdrop-blur-xl">
+      <aside className="hidden lg:flex w-[260px] flex-shrink-0 flex-col bg-sidebar/80 border-r border-white/5 backdrop-blur-xl">
         {navContent}
       </aside>
     </>

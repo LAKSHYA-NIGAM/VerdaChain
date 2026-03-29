@@ -3,38 +3,58 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Leaf, Loader2, Lock, Mail } from "lucide-react";
+import { Leaf, Loader2, Lock, Mail, Eye, EyeOff } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+
+// ── Valid credentials ────────────────────────────────────────────────────────
+const VALID_CREDENTIALS = {
+  email: "admin@verdachain.com",
+  password: "verdachain2026",
+};
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
 
     if (!email.trim() || !password.trim()) {
-      toast.error("Please fill in all fields");
+      setError("Please fill in all fields");
       return;
     }
 
     setLoading(true);
+    await new Promise((r) => setTimeout(r, 1000));
 
-    // Simulate auth delay
-    await new Promise((r) => setTimeout(r, 1200));
+    const emailMatch = email.trim().toLowerCase() === VALID_CREDENTIALS.email;
+    const passwordMatch = password === VALID_CREDENTIALS.password;
 
-    // Mock authentication — any credentials work
-    localStorage.setItem("verdachain-auth", JSON.stringify({
-      email: email.trim(),
-      loggedInAt: new Date().toISOString(),
-    }));
+    if (!emailMatch || !passwordMatch) {
+      setLoading(false);
+      setError("Invalid email or password. Please check your credentials.");
+      toast.error("Authentication failed");
+      return;
+    }
 
-    toast.success("Welcome to VerdaChain", {
-      description: `Signed in as ${email.trim()}`,
+    localStorage.setItem(
+      "verdachain-auth",
+      JSON.stringify({
+        email: VALID_CREDENTIALS.email,
+        name: "VerdaChain Admin",
+        loggedInAt: new Date().toISOString(),
+      })
+    );
+
+    toast.success("Welcome back!", {
+      description: `Signed in as ${VALID_CREDENTIALS.email}`,
     });
 
     setLoading(false);
@@ -42,7 +62,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-[#050805]">
+    <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-background">
       {/* Background effects */}
       <div className="absolute inset-0">
         <div className="absolute inset-0 bg-gradient-to-br from-emerald-900/20 via-transparent to-emerald-950/10 animated-gradient" />
@@ -86,9 +106,9 @@ export default function LoginPage() {
                 <Input
                   id="login-email"
                   type="email"
-                  placeholder="you@company.com"
+                  placeholder="admin@verdachain.com"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => { setEmail(e.target.value); setError(null); }}
                   className="pl-10 h-11 rounded-xl bg-white/[0.04] border-white/8 text-white placeholder:text-white/20 focus-visible:ring-emerald-500/30"
                 />
               </div>
@@ -103,14 +123,32 @@ export default function LoginPage() {
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/25" />
                 <Input
                   id="login-password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10 h-11 rounded-xl bg-white/[0.04] border-white/8 text-white placeholder:text-white/20 focus-visible:ring-emerald-500/30"
+                  onChange={(e) => { setPassword(e.target.value); setError(null); }}
+                  className="pl-10 pr-10 h-11 rounded-xl bg-white/[0.04] border-white/8 text-white placeholder:text-white/20 focus-visible:ring-emerald-500/30"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/25 hover:text-white/50 transition-colors"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
             </div>
+
+            {/* Error message */}
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2"
+              >
+                {error}
+              </motion.div>
+            )}
 
             {/* Submit */}
             <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
@@ -128,9 +166,12 @@ export default function LoginPage() {
             </motion.div>
           </form>
 
-          <p className="mt-6 text-center text-xs text-white/20">
-            Demo mode — any credentials will work
-          </p>
+          {/* Credential hint */}
+          <div className="mt-6 p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
+            <p className="text-xs text-white/30 text-center font-medium mb-1">Demo credentials</p>
+            <p className="text-xs text-emerald-400/60 text-center font-mono">admin@verdachain.com</p>
+            <p className="text-xs text-emerald-400/60 text-center font-mono">verdachain2026</p>
+          </div>
         </div>
       </motion.div>
     </div>

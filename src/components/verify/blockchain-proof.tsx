@@ -1,22 +1,33 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ExternalLink, Clock, Blocks, Globe, Copy, Check } from "lucide-react";
+import { ExternalLink, Clock, Blocks, Globe, Copy, Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { BlockchainProof as BlockchainProofType } from "@/lib/mock-data";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import { connectWallet, storeVerificationOnChain, getEtherscanUrl, CONTRACT_ADDRESS } from "@/lib/blockchain";
+
+interface BackendResult {
+  creditId: string;
+  riskScore: number;
+  status: string;
+  resultHash: string;
+  [key: string]: unknown;
+}
 
 interface BlockchainProofProps {
   proof: BlockchainProofType;
+  verificationData?: BackendResult | null;
 }
 
-export function BlockchainProofPanel({ proof }: BlockchainProofProps) {
+type ChainState = "idle" | "connecting" | "sending" | "confirmed" | "error";
+
+export function BlockchainProofPanel({ proof, verificationData }: BlockchainProofProps) {
   const [formattedDate, setFormattedDate] = useState<string>("");
-  const [formattedBlock, setFormattedBlock] = useState<string>(
-    String(proof.blockNumber)
-  );
   const [copied, setCopied] = useState(false);
+  const [chainState, setChainState] = useState<ChainState>("idle");
+  const [realTxHash, setRealTxHash] = useState<string | null>(null);
 
   useEffect(() => {
     setFormattedDate(
@@ -25,12 +36,12 @@ export function BlockchainProofPanel({ proof }: BlockchainProofProps) {
         timeStyle: "short",
       })
     );
-    setFormattedBlock(proof.blockNumber.toLocaleString());
-  }, [proof.timestamp, proof.blockNumber]);
+  }, [proof.timestamp]);
 
   const handleCopyHash = async () => {
+    const hashToCopy = realTxHash || proof.txHash;
     try {
-      await navigator.clipboard.writeText(proof.txHash);
+      await navigator.clipboard.writeText(hashToCopy);
       setCopied(true);
       toast.success("Transaction hash copied!");
       setTimeout(() => setCopied(false), 2000);
@@ -39,10 +50,42 @@ export function BlockchainProofPanel({ proof }: BlockchainProofProps) {
     }
   };
 
-  const handleViewOnChain = () => {
-    // Open Etherscan with the simulated tx hash
-    const etherscanUrl = `https://etherscan.io/tx/${proof.txHash}`;
-    window.open(etherscanUrl, "_blank", "noopener,noreferrer");
+  const handleStoreOnChain = async () => {
+    if (!verificationData) {
+      toast.error("No verification data to store");
+      return;
+    }
+
+    try {
+      // Step 1: Connect wallet
+      setChainState("connecting");
+      toast.loading("Connecting to MetaMask...", { id: "chain" });
+      const account = await connectWallet();
+
+      // Guard: warn clearly if contract hasn't been deployed yet
+      if (CONTRACT_ADDRESS.startsWith("0x_REPLACE")) {
+        throw new Error("Smart contract not deployed yet. Follow contracts/DEPLOY_INSTRUCTIONS.md to deploy on Sepolia, then update CONTRACT_ADDRESS in src/lib/blockchain.ts");
+      }
+
+      // Step 2: Send transaction
+      setChainState("sending");
+      toast.loading("Writing to Ethereum...", { id: "chain" });
+      const txHash = await storeVerificationOnChain(
+        verificationData.creditId,
+        verificationData.resultHash,
+        verificationData.riskScore,
+        verificationData.status
+      );
+
+      // Step 3: Confirmed
+      setRealTxHash(txHash);
+      setChainState("confirmed");
+      toast.success("Audit stored on blockchain!", { id: "chain" });
+    } catch (err) {
+      setChainState("error");
+      const message = err instanceof Error ? err.message : "Transaction failed";
+      toast.error(message, { id: "chain" });
+    }
   };
 
   return (
@@ -60,12 +103,12 @@ export function BlockchainProofPanel({ proof }: BlockchainProofProps) {
       </div>
 
       <div className="space-y-4">
-        {/* Tx Hash */}
+        {/* SHA-256 Result Hash */}
         <div>
-          <p className="text-xs text-white/40 mb-1">Transaction Hash</p>
+          <p className="text-xs text-white/40 mb-1">Result Hash (SHA-256)</p>
           <div className="flex items-center gap-2">
             <code className="flex-1 text-sm text-emerald-400 font-mono bg-emerald-500/5 px-3 py-1.5 rounded-lg break-all">
-              {proof.txHash}
+              {realTxHash || proof.txHash}
             </code>
             <button
               onClick={handleCopyHash}
@@ -92,38 +135,86 @@ export function BlockchainProofPanel({ proof }: BlockchainProofProps) {
           </div>
         </div>
 
-        {/* Block Number */}
-        <div className="flex items-center gap-2">
-          <Blocks className="h-4 w-4 text-white/30" />
-          <div>
-            <p className="text-xs text-white/40">Block Number</p>
-            <p className="text-sm text-white/80 font-mono" suppressHydrationWarning>
-              {formattedBlock}
-            </p>
-          </div>
-        </div>
-
         {/* Network */}
         <div className="flex items-center gap-2">
           <Globe className="h-4 w-4 text-white/30" />
           <div>
             <p className="text-xs text-white/40">Network</p>
-            <p className="text-sm text-white/80">{proof.network}</p>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+              <p className="text-sm text-emerald-400 font-medium">Sepolia Testnet</p>
+            </div>
           </div>
         </div>
+
+        {/* Confirmed State */}
+        {chainState === "confirmed" && realTxHash && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-3 pt-2"
+          >
+            <div className="flex items-center gap-2 text-emerald-400">
+              <Check className="h-4 w-4" />
+              <span className="text-sm font-medium">✅ Audit stored on Ethereum blockchain</span>
+            </div>
+            <div>
+              <p className="text-xs text-white/40 mb-1">Transaction Hash</p>
+              <code className="text-xs text-emerald-400/80 font-mono break-all">
+                {realTxHash}
+              </code>
+            </div>
+            <a
+              href={getEtherscanUrl(realTxHash)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-sm text-blue-400 hover:text-blue-300 underline transition-colors"
+            >
+              🔗 View on Etherscan
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+            <p className="text-xs text-white/20">
+              This record is now permanent and tamper-proof.
+            </p>
+          </motion.div>
+        )}
       </div>
 
-      {/* View on Chain Button */}
-      <motion.div className="mt-5" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-        <Button
-          onClick={handleViewOnChain}
-          variant="outline"
-          className="w-full h-10 rounded-xl border-emerald-500/20 bg-emerald-500/5 text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500/30 transition-all gap-2 cursor-pointer"
-        >
-          <ExternalLink className="h-4 w-4" />
-          View on Chain
-        </Button>
-      </motion.div>
+      {/* Blockchain Action Button */}
+      {chainState !== "confirmed" && (
+        <motion.div className="mt-5" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+          <Button
+            onClick={chainState === "error" ? () => setChainState("idle") : handleStoreOnChain}
+            disabled={chainState === "connecting" || chainState === "sending"}
+            variant="outline"
+            className={`w-full h-10 rounded-xl transition-all gap-2 cursor-pointer ${
+              chainState === "error"
+                ? "border-red-500/20 bg-red-500/5 text-red-400 hover:bg-red-500/10"
+                : "border-emerald-500/20 bg-emerald-500/5 text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500/30"
+            }`}
+          >
+            {chainState === "idle" && (
+              <>
+                <Blocks className="h-4 w-4" />
+                ⛓️ Store Audit on Blockchain
+              </>
+            )}
+            {chainState === "connecting" && (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                🔌 Connecting MetaMask...
+              </>
+            )}
+            {chainState === "sending" && (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                📤 Writing to Ethereum...
+              </>
+            )}
+            {chainState === "error" && "❌ Failed — Try Again"}
+          </Button>
+        </motion.div>
+      )}
     </motion.div>
   );
 }

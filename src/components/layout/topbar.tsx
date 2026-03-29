@@ -6,14 +6,28 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { connectWallet } from "@/lib/blockchain";
 
 export function Topbar() {
   const router = useRouter();
-  const [walletConnected, setWalletConnected] = useState(false);
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [walletConnecting, setWalletConnecting] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [userEmail, setUserEmail] = useState("user@verdachain.com");
+  const [userName, setUserName] = useState("VerdaChain User");
   const notifRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
+
+  // Load user from localStorage
+  useEffect(() => {
+    const raw = localStorage.getItem("verdachain-auth");
+    if (raw) {
+      const data = JSON.parse(raw);
+      if (data.email) setUserEmail(data.email);
+      if (data.name) setUserName(data.name);
+    }
+  }, []);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -35,14 +49,25 @@ export function Topbar() {
     router.push("/login");
   };
 
-  const handleWalletConnect = () => {
-    setWalletConnected(!walletConnected);
-    if (!walletConnected) {
-      toast.success("Wallet connected", {
-        description: "0x7a3b...9f2e",
-      });
-    } else {
+  const handleWalletConnect = async () => {
+    if (walletAddress) {
+      setWalletAddress(null);
       toast("Wallet disconnected");
+      return;
+    }
+
+    try {
+      setWalletConnecting(true);
+      const address = await connectWallet();
+      setWalletAddress(address);
+      toast.success("Wallet connected", {
+        description: `${address.slice(0, 6)}...${address.slice(-4)}`,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to connect wallet";
+      toast.error(message);
+    } finally {
+      setWalletConnecting(false);
     }
   };
 
@@ -53,7 +78,7 @@ export function Topbar() {
   ];
 
   return (
-    <header className="relative z-50 h-16 flex items-center justify-between px-6 lg:px-8 border-b border-white/5 bg-[#0a0e0a]/60 backdrop-blur-xl">
+    <header className="relative z-50 h-16 flex items-center justify-between px-6 lg:px-8 border-b border-white/5 bg-sidebar/60 backdrop-blur-xl">
       {/* Left spacer for mobile menu */}
       <div className="lg:hidden w-10" />
 
@@ -120,21 +145,34 @@ export function Topbar() {
         <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
           <Button
             onClick={handleWalletConnect}
+            disabled={walletConnecting}
             variant="outline"
             className={`
               h-9 gap-2 text-sm font-medium rounded-xl border transition-all duration-300 cursor-pointer
               ${
-                walletConnected
+                walletAddress
                   ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/15"
                   : "border-white/10 bg-white/[0.03] text-white/70 hover:text-white hover:border-white/20 hover:bg-white/[0.06]"
               }
             `}
           >
-            <Wallet className="h-4 w-4" />
-            {walletConnected ? (
-              <span className="hidden sm:inline">0x7a3b...9f2e</span>
+            {walletConnecting ? (
+              <>
+                <div className="h-4 w-4 border-2 border-emerald-400/30 border-t-emerald-400 rounded-full animate-spin" />
+                <span className="hidden sm:inline">Connecting...</span>
+              </>
+            ) : walletAddress ? (
+              <>
+                <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+                <span className="hidden sm:inline font-mono text-emerald-400">
+                  {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+                </span>
+              </>
             ) : (
-              <span className="hidden sm:inline">Connect Wallet</span>
+              <>
+                <Wallet className="h-4 w-4" />
+                <span className="hidden sm:inline">Connect Wallet</span>
+              </>
             )}
           </Button>
         </motion.div>
@@ -164,15 +202,21 @@ export function Topbar() {
                 className="absolute right-0 top-12 w-52 glass-strong rounded-2xl border border-white/[0.06] shadow-2xl z-50 overflow-hidden"
               >
                 <div className="p-3 border-b border-white/5">
-                  <p className="text-sm font-medium text-white">VerdaChain User</p>
-                  <p className="text-xs text-white/30">user@verdachain.com</p>
+                  <p className="text-sm font-medium text-white">{userName}</p>
+                  <p className="text-xs text-white/30">{userEmail}</p>
                 </div>
                 <div className="p-1.5">
-                  <button className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-white/60 hover:text-white/80 hover:bg-white/[0.04] transition-colors cursor-pointer">
+                  <button
+                    onClick={() => { setShowProfile(false); router.push("/dashboard/profile"); }}
+                    className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-white/60 hover:text-white/80 hover:bg-white/[0.04] transition-colors cursor-pointer"
+                  >
                     <User className="h-4 w-4" />
                     Profile
                   </button>
-                  <button className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-white/60 hover:text-white/80 hover:bg-white/[0.04] transition-colors cursor-pointer">
+                  <button
+                    onClick={() => { setShowProfile(false); router.push("/dashboard/settings"); }}
+                    className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-white/60 hover:text-white/80 hover:bg-white/[0.04] transition-colors cursor-pointer"
+                  >
                     <Settings className="h-4 w-4" />
                     Settings
                   </button>

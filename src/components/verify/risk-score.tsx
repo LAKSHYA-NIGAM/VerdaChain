@@ -38,6 +38,25 @@ export function RiskScore({ score, status }: RiskScoreProps) {
     return () => clearTimeout(timer);
   }, [score]);
 
+  // For 2B: high risk glow style
+  const ringContainerStyle = score >= 66
+    ? {
+        filter: 'drop-shadow(0 0 40px #ef444488)',
+        animation: 'ringPulse 1.5s ease-in-out infinite'
+      }
+    : {};
+
+  // For 2C: verdict text
+  const statusUpper = status.toUpperCase();
+  const verdictText =
+    statusUpper.includes('HIGH') ? '⛔ DO NOT PURCHASE' :
+    statusUpper.includes('MEDIUM') ? '⚠️ REQUIRES AUDIT' :
+    '✅ CLEARED FOR TRADING';
+  const verdictColor =
+    statusUpper.includes('HIGH') ? 'text-red-400' :
+    statusUpper.includes('MEDIUM') ? 'text-yellow-400' :
+    'text-emerald-400';
+
   return (
     <motion.div
       initial={{ scale: 0.8, opacity: 0 }}
@@ -45,12 +64,28 @@ export function RiskScore({ score, status }: RiskScoreProps) {
       transition={{ duration: 0.6, delay: 0.1 }}
       className="flex flex-col items-center"
     >
-      <div className="relative w-52 h-52">
+      {/* Ring container — 2B: conditional glow */}
+      <div className="relative w-52 h-52" style={ringContainerStyle}>
         {/* Glow effect */}
         <div
           className="absolute inset-4 rounded-full blur-xl opacity-30"
           style={{ background: color.bg }}
         />
+
+        {/* 2A: Outer spinning dashed ring (behind main SVG) */}
+        <svg
+          className="absolute inset-0 w-full h-full"
+          style={{ animation: 'spin 8s linear infinite' }}
+          viewBox="0 0 200 200"
+        >
+          <circle
+            cx="100" cy="100" r="88"
+            fill="none"
+            stroke="#374151"
+            strokeWidth="1"
+            strokeDasharray="4 8"
+          />
+        </svg>
 
         {/* SVG Ring */}
         <svg className="w-52 h-52 transform -rotate-90" viewBox="0 0 200 200">
@@ -109,6 +144,14 @@ export function RiskScore({ score, status }: RiskScoreProps) {
           {status}
         </div>
       </motion.div>
+
+      {/* 2C: VERDICT label */}
+      <div
+        className={`text-lg font-black tracking-widest mt-2 transition-opacity duration-500 ${verdictColor}`}
+        style={{ animation: 'fadeIn 0.5s ease-in 0.8s both' }}
+      >
+        {verdictText}
+      </div>
     </motion.div>
   );
 }

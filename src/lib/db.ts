@@ -1,92 +1,37 @@
-import mongoose from "mongoose";
-
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/verdachain";
+import { desc } from "drizzle-orm";
+import { db } from "./neon";
+import { verifications } from "./schema";
+import type { NewVerification, Verification } from "./schema";
 
 /**
- * Global cache for MongoDB connection.
- * Prevents multiple connections during Next.js hot-reloads in development.
- * Supports automatic retry after transient failures.
+ * Insert a new verification record into Neon DB.
  */
-interface MongooseCache {
-  conn: typeof mongoose | null;
-  promise: Promise<typeof mongoose> | null;
-  lastAttempt: number;
-}
-
-declare global {
-  // eslint-disable-next-line no-var
-  var mongooseCache: MongooseCache | undefined;
-}
-
-// Retry cooldown: wait 10s between reconnection attempts after failure
-const RETRY_COOLDOWN_MS = 10_000;
-
-const cached: MongooseCache = global.mongooseCache ?? {
-  conn: null,
-  promise: null,
-  lastAttempt: 0,
-};
-
-if (!global.mongooseCache) {
-  global.mongooseCache = cached;
+export async function insertVerification(
+  data: NewVerification
+): Promise<Verification> {
+  const [record] = await db.insert(verifications).values(data).returning();
+  return record;
 }
 
 /**
- * Connect to MongoDB with connection reuse and retry logic.
- * - Reuses existing connections (safe across hot-reloads)
- * - Retries after cooldown period on failure (not permanently blocked)
- * - Uses short timeout so the app doesn't hang when Mongo is down
+ * Fetch the most recent verification records (newest first).
  */
-export async function connectDB(): Promise<typeof mongoose> {
-  // Return cached connection if already connected
-  if (cached.conn && cached.conn.connection.readyState === 1) {
-    return cached.conn;
-  }
+export async function getVerifications(limit = 100): Promise<Verification[]> {
+  return db
+    .select()
+    .from(verifications)
+    .orderBy(desc(verifications.createdAt))
+    .limit(limit);
+}
 
-  // If a previous attempt failed, enforce cooldown before retrying
-  if (!cached.promise && cached.lastAttempt > 0) {
-    const elapsed = Date.now() - cached.lastAttempt;
-    if (elapsed < RETRY_COOLDOWN_MS) {
-      throw new Error(
-        `MongoDB connection failed recently. Retrying in ${Math.ceil((RETRY_COOLDOWN_MS - elapsed) / 1000)}s.`
-      );
-    }
-  }
-
-  // Start a new connection if none is in progress
-  if (!cached.promise) {
-    cached.lastAttempt = Date.now();
-
-    // Set mongoose options for App Router compatibility
-    mongoose.set("bufferCommands", false);
-
-    cached.promise = mongoose
-      .connect(MONGODB_URI, {
-        serverSelectionTimeoutMS: 5000,
-        socketTimeoutMS: 10000,
-        maxPoolSize: 10,
-      })
-      .then((conn) => {
-        console.log("[VerdaChain] MongoDB connected successfully");
-        return conn;
-      });
-  }
-
+/**
+ * Check if the DB is reachable (used in health checks / diagnostics).
+ */
+export async function isDBConnected(): Promise<boolean> {
   try {
-    cached.conn = await cached.promise;
-    return cached.conn;
-  } catch (e) {
-    // Reset promise so future calls can retry after cooldown
-    cached.promise = null;
-    cached.conn = null;
-    console.error("[VerdaChain] MongoDB connection failed:", e instanceof Error ? e.message : e);
-    throw e;
+    await db.select().from(verifications).limit(1);
+    return true;
+  } catch {
+    return false;
   }
-}
-
-/**
- * Check if MongoDB is currently connected and healthy.
- */
-export function isDBConnected(): boolean {
-  return cached.conn !== null && cached.conn.connection.readyState === 1;
 }

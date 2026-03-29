@@ -1,17 +1,15 @@
 import { NextResponse } from "next/server";
-import { connectDB } from "@/lib/db";
-import { Credit } from "@/models/Credit";
-import { Verification } from "@/models/Verification";
-import { generateTxHash } from "@/lib/blockchain";
-import { analyzeCredit, getKnownMetadata } from "@/lib/risk-engine";
-import type { VerifyResponse } from "@/lib/types";
-import { getInMemoryStore } from "@/lib/store";
+import { analyzeCredit } from "@/lib/risk-engine";
+import { createHash } from "crypto";
+
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
 // ─── POST /api/verify ─────────────────────────────────────────────────────────
+// Tries the Python AI backend first. If unavailable (e.g. on Vercel),
+// falls back to the built-in risk engine.
 
 export async function POST(request: Request) {
   try {
-    // Parse and validate request body
     let body: Record<string, unknown>;
     try {
       body = await request.json();
@@ -30,70 +28,60 @@ export async function POST(request: Request) {
     }
 
     const creditId = body.creditId.trim().toUpperCase();
+    let result: Record<string, unknown>;
 
-    // Run risk analysis
-    const analysis = analyzeCredit(creditId);
-
-    // Check if DB has better metadata for this credit
-    let dbConnected = false;
+    // ── Strategy 1: Try the Python AI backend ──
     try {
-      await connectDB();
-      dbConnected = true;
+      const backendRes = await fetch(`${BACKEND_URL}/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ creditId }),
+        signal: AbortSignal.timeout(15000), // 15s timeout
+      });
 
-      const dbCredit = await Credit.findOne({ creditId }).lean();
-      if (dbCredit) {
-        // Override with DB metadata if available
-        analysis.metadata = {
-          projectName: dbCredit.projectName,
-          registry: dbCredit.registry,
-          location: dbCredit.location,
-          issuedCredits: dbCredit.issuedCredits,
-        };
+      if (backendRes.ok) {
+        result = await backendRes.json();
+      } else {
+        throw new Error(`Backend returned ${backendRes.status}`);
       }
-    } catch {
-      // MongoDB unavailable — analysis.metadata from risk engine is used
-      console.warn("[/api/verify] MongoDB unavailable, using in-memory fallback");
+    } catch (backendErr) {
+      // ── Strategy 2: Fall back to built-in risk engine ──
+      console.warn("[/api/verify] Python backend unavailable, using local engine:", backendErr);
+
+      const analysis = analyzeCredit(creditId);
+      const resultString = JSON.stringify(analysis, Object.keys(analysis).sort());
+      const sha256 = createHash("sha256").update(resultString).digest("hex");
+
+      result = {
+        creditId,
+        riskScore: analysis.riskScore,
+        status: analysis.status.toUpperCase(),
+        flags: analysis.flags.map((f: string) => {
+          if (analysis.riskScore > 65) return `❌ ${f}`;
+          if (analysis.riskScore > 30) return `⚠️ ${f}`;
+          return `✅ ${f}`;
+        }),
+        summary: `Local risk engine analysis: Credit ${creditId} scored ${analysis.riskScore}/100 (${analysis.status}). ${analysis.flags.length} risk indicator(s) detected.`,
+        resultHash: `0x${sha256}`,
+        project: analysis.metadata.projectName,
+        location: analysis.metadata.location,
+        issuer: analysis.metadata.registry,
+        creditsIssued: analysis.metadata.issuedCredits,
+      };
     }
 
-    // Generate blockchain transaction hash
-    const txHash = generateTxHash(creditId);
-    const timestamp = new Date();
-
-    // Build verification record
-    const record = {
-      creditId,
-      riskScore: analysis.riskScore,
-      status: analysis.status,
-      flags: analysis.flags,
-      metadata: analysis.metadata,
-      txHash,
-      timestamp,
-    };
-
-    // Persist: MongoDB first, fallback to memory
-    if (dbConnected) {
-      try {
-        await Verification.create(record);
-      } catch (saveErr) {
-        console.warn("[/api/verify] MongoDB save failed, using memory:", saveErr);
-        getInMemoryStore().push({ ...record });
-      }
-    } else {
-      getInMemoryStore().push({ ...record });
+    // Save to Neon DB (best-effort)
+    try {
+      await fetch(new URL("/api/verifications", request.url).toString(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(result),
+      });
+    } catch (saveErr) {
+      console.warn("[/api/verify] Failed to save to MongoDB:", saveErr);
     }
 
-    // Build response
-    const response: VerifyResponse = {
-      creditId: record.creditId,
-      riskScore: record.riskScore,
-      status: record.status,
-      flags: record.flags,
-      metadata: record.metadata,
-      txHash: record.txHash,
-      timestamp: record.timestamp.toISOString(),
-    };
-
-    return NextResponse.json(response, { status: 200 });
+    return NextResponse.json(result, { status: 200 });
   } catch (error) {
     console.error("[/api/verify] Unhandled error:", error);
     return NextResponse.json(

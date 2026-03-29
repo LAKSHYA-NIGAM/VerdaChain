@@ -1,93 +1,30 @@
-import { NextResponse } from "next/server";
-import { connectDB } from "@/lib/db";
-import { Verification } from "@/models/Verification";
-import { getInMemoryStore, type InMemoryVerification } from "@/lib/store";
+import { NextRequest, NextResponse } from "next/server";
+import { insertVerification, getVerifications } from "@/lib/db";
 
-// ─── Response shape ──────────────────────────────────────────────────────────
+// ─── POST /api/verifications — Save a new verification ────────────────────────
 
-interface VerificationResponse {
-  _id?: string;
-  creditId: string;
-  riskScore: number;
-  status: "High Risk" | "Medium Risk" | "Low Risk";
-  flags: string[];
-  metadata: {
-    projectName: string;
-    registry: string;
-    location: string;
-    issuedCredits: number;
-  };
-  txHash: string;
-  timestamp: string;
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const record = await insertVerification(body);
+    return NextResponse.json(record, { status: 201 });
+  } catch (error) {
+    console.error("[/api/verifications] POST error:", error);
+    return NextResponse.json(
+      { error: "Failed to save verification" },
+      { status: 500 }
+    );
+  }
 }
 
-// ─── GET /api/verifications ───────────────────────────────────────────────────
+// ─── GET /api/verifications — Fetch all verifications ─────────────────────────
 
 export async function GET() {
   try {
-    const results: VerificationResponse[] = [];
-
-    // 1. Try fetching from MongoDB
-    try {
-      await connectDB();
-      const dbRecords = await Verification.find({})
-        .sort({ timestamp: -1 })
-        .lean();
-
-      for (const doc of dbRecords) {
-        results.push({
-          _id: doc._id?.toString(),
-          creditId: doc.creditId,
-          riskScore: doc.riskScore,
-          status: doc.status,
-          flags: doc.flags,
-          metadata: {
-            projectName: doc.metadata.projectName,
-            registry: doc.metadata.registry,
-            location: doc.metadata.location,
-            issuedCredits: doc.metadata.issuedCredits,
-          },
-          txHash: doc.txHash,
-          timestamp: doc.timestamp instanceof Date
-            ? doc.timestamp.toISOString()
-            : String(doc.timestamp),
-        });
-      }
-    } catch {
-      console.warn("[/api/verifications] MongoDB unavailable, using memory store only");
-    }
-
-    // 2. Add in-memory records (deduplicated by txHash)
-    const existingHashes = new Set(results.map((r) => r.txHash));
-    const memoryRecords = getInMemoryStore();
-
-    for (const mem of memoryRecords) {
-      if (!existingHashes.has(mem.txHash)) {
-        results.push({
-          creditId: mem.creditId,
-          riskScore: mem.riskScore,
-          status: mem.status,
-          flags: mem.flags,
-          metadata: mem.metadata,
-          txHash: mem.txHash,
-          timestamp: mem.timestamp instanceof Date
-            ? mem.timestamp.toISOString()
-            : String(mem.timestamp),
-        });
-      }
-    }
-
-    // 3. Sort all results by timestamp descending
-    results.sort((a, b) =>
-      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-    );
-
-    return NextResponse.json(results, { status: 200 });
+    const records = await getVerifications();
+    return NextResponse.json(records);
   } catch (error) {
-    console.error("[/api/verifications] Unhandled error:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch verifications" },
-      { status: 500 }
-    );
+    console.error("[/api/verifications] GET error:", error);
+    return NextResponse.json([], { status: 200 });
   }
 }

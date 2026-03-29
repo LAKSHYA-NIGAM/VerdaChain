@@ -12,7 +12,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { VerificationRecord } from "@/lib/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -20,29 +19,29 @@ interface AuditEntry {
   id: string;
   creditId: string;
   riskScore: number;
-  status: "High Risk" | "Medium Risk" | "Low Risk";
+  status: string;
   timestamp: string;
   txHash: string;
   projectName: string;
   registry: string;
   flags: string[];
+  summary?: string;
 }
 
 // ─── Status Badge ─────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: string }) {
-  const colors = {
-    "High Risk": "bg-red-500/10 text-red-400 border-red-500/20",
-    "Medium Risk": "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
-    "Low Risk": "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-  };
+  const normalized = status.toUpperCase();
+  const colors = normalized.includes("HIGH")
+    ? "bg-red-500/10 text-red-400 border-red-500/20"
+    : normalized.includes("MEDIUM")
+    ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/20"
+    : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
 
   return (
     <Badge
       variant="outline"
-      className={`text-xs font-medium rounded-full px-2.5 py-0.5 ${
-        colors[status as keyof typeof colors] || colors["Medium Risk"]
-      }`}
+      className={`text-xs font-medium rounded-full px-2.5 py-0.5 ${colors}`}
     >
       {status}
     </Badge>
@@ -144,13 +143,13 @@ function DetailModal({
               <span className="text-white/80 font-medium text-right max-w-[60%]">{log.projectName}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-white/40">Registry</span>
+              <span className="text-white/40">Registry / Issuer</span>
               <span className="text-white/80">{log.registry}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-white/40">Tx Hash</span>
+              <span className="text-white/40">Result Hash</span>
               <code className="text-emerald-400/80 text-xs font-mono">
-                {log.txHash.slice(0, 10)}...{log.txHash.slice(-4)}
+                {log.txHash ? `${log.txHash.slice(0, 10)}...${log.txHash.slice(-4)}` : "Pending"}
               </code>
             </div>
             <div className="flex justify-between">
@@ -160,6 +159,16 @@ function DetailModal({
               </span>
             </div>
           </div>
+
+          {/* Summary */}
+          {log.summary && (
+            <div className="space-y-2">
+              <p className="text-xs text-white/40 uppercase tracking-wider">AI Verdict</p>
+              <div className="glass rounded-lg px-3 py-2 text-xs text-white/60">
+                {log.summary}
+              </div>
+            </div>
+          )}
 
           {/* Flags */}
           {log.flags.length > 0 && (
@@ -173,13 +182,18 @@ function DetailModal({
             </div>
           )}
 
-          <Button
-            variant="outline"
-            className="w-full h-10 rounded-xl border-emerald-500/20 bg-emerald-500/5 text-emerald-400 hover:bg-emerald-500/10 gap-2"
-          >
-            <ExternalLink className="h-4 w-4" />
-            View Full Report
-          </Button>
+          {log.txHash && (
+            <Button
+              variant="outline"
+              className="w-full h-10 rounded-xl border-emerald-500/20 bg-emerald-500/5 text-emerald-400 hover:bg-emerald-500/10 gap-2"
+              onClick={() => {
+                navigator.clipboard.writeText(log.txHash);
+              }}
+            >
+              <ExternalLink className="h-4 w-4" />
+              Copy Result Hash
+            </Button>
+          )}
         </div>
       </DialogContent>
     </Dialog>
@@ -195,24 +209,27 @@ export default function AuditPage() {
   const [logs, setLogs] = useState<AuditEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch verifications from API
+  // Fetch verifications from MongoDB via API
   useEffect(() => {
     async function fetchLogs() {
       try {
         const res = await fetch("/api/verifications");
         if (!res.ok) throw new Error("Failed to fetch");
-        const data: VerificationRecord[] = await res.json();
+        const data = await res.json();
 
-        const mapped: AuditEntry[] = data.map((v, i) => ({
-          id: v._id || String(i),
-          creditId: v.creditId,
-          riskScore: v.riskScore,
-          status: v.status,
-          timestamp: typeof v.timestamp === "string" ? v.timestamp : new Date(v.timestamp).toISOString(),
-          txHash: v.txHash,
-          projectName: v.metadata.projectName,
-          registry: v.metadata.registry,
-          flags: v.flags,
+        const mapped: AuditEntry[] = data.map((v: Record<string, unknown>, i: number) => ({
+          id: (v._id as string) || String(i),
+          creditId: v.creditId as string,
+          riskScore: v.riskScore as number,
+          status: v.status as string,
+          timestamp: v.createdAt
+            ? (typeof v.createdAt === "string" ? v.createdAt : new Date(v.createdAt as string).toISOString())
+            : new Date().toISOString(),
+          txHash: (v.resultHash as string) || (v.txHash as string) || "",
+          projectName: (v.project as string) || "Unknown Project",
+          registry: (v.issuer as string) || "Unknown",
+          flags: (v.flags as string[]) || [],
+          summary: (v.summary as string) || "",
         }));
 
         setLogs(mapped);
@@ -230,11 +247,11 @@ export default function AuditPage() {
       log.creditId.toLowerCase().includes(search.toLowerCase()) ||
       log.projectName.toLowerCase().includes(search.toLowerCase());
     const matchesStatus =
-      statusFilter === "all" || log.status === statusFilter;
+      statusFilter === "all" || log.status.toUpperCase().includes(statusFilter.toUpperCase());
     return matchesSearch && matchesStatus;
   });
 
-  const statuses = ["all", "High Risk", "Medium Risk", "Low Risk"];
+  const statuses = ["all", "HIGH", "MEDIUM", "LOW"];
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -249,6 +266,26 @@ export default function AuditPage() {
           Complete history of all carbon credit verifications
         </p>
       </motion.div>
+
+      {/* Live Threat Banner */}
+      <div className="relative overflow-hidden bg-emerald-950 border-b border-emerald-800 rounded-lg px-6 py-3 mb-4">
+        {/* Shimmer sweep */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: 'linear-gradient(90deg, transparent 0%, rgba(16,185,129,0.08) 50%, transparent 100%)',
+            backgroundSize: '200% 100%',
+            animation: 'shimmerSweep 3s ease-in-out infinite'
+          }}
+        />
+        <div className="relative flex items-center justify-center gap-0 text-sm font-medium flex-wrap">
+          <span className="px-4 text-red-400">🔴 3 HIGH RISK detected today</span>
+          <span className="border-r border-emerald-800 h-4 hidden sm:inline-block" />
+          <span className="px-4 text-gray-300">⚡ Last scan: 2 mins ago</span>
+          <span className="border-r border-emerald-800 h-4 hidden sm:inline-block" />
+          <span className="px-4 text-gray-300">⛓️ 634 records on-chain</span>
+        </div>
+      </div>
 
       {/* Filters */}
       <motion.div
@@ -286,7 +323,7 @@ export default function AuditPage() {
                   : "text-white/40 hover:text-white/60"
               }`}
             >
-              {s === "all" ? "All" : s}
+              {s === "all" ? "All" : `${s} Risk`}
             </button>
           ))}
         </div>

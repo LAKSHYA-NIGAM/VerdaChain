@@ -18,14 +18,20 @@ export default function DashboardLayout({
     if (!auth) {
       router.replace("/login");
     } else {
+      // Restore saved theme
+      const theme = localStorage.getItem("verdachain-theme");
+      if (theme && theme !== "dark") {
+        document.documentElement.setAttribute("data-theme", theme);
+      } else {
+        document.documentElement.removeAttribute("data-theme");
+      }
       setChecked(true);
     }
   }, [router]);
 
-  // Show nothing until auth check completes to avoid flash
   if (!checked) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#050805]">
+      <div className="flex h-screen items-center justify-center bg-background">
         <div className="w-8 h-8 rounded-full border-2 border-emerald-500/30 border-t-emerald-400 animate-spin" />
       </div>
     );

@@ -135,6 +135,71 @@
   }
 }
 
+/* ── Theme overrides (applied via data-theme on <html>) ───────────────────── */
+
+[data-theme="dim"] {
+  --background: oklch(0.14 0.006 160);
+  --foreground: oklch(0.92 0 0);
+  --card: oklch(0.18 0.006 160);
+  --card-foreground: oklch(0.92 0 0);
+  --popover: oklch(0.18 0.006 160);
+  --popover-foreground: oklch(0.92 0 0);
+  --secondary: oklch(0.22 0.006 160);
+  --muted: oklch(0.22 0.008 160);
+  --accent: oklch(0.26 0.01 160);
+  --sidebar: oklch(0.16 0.006 160);
+  --sidebar-foreground: oklch(0.82 0 0);
+  --sidebar-accent: oklch(0.22 0.008 160);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 14%);
+}
+
+[data-theme="dim"] .glass {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.09);
+}
+[data-theme="dim"] .glass-strong {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.13);
+}
+
+[data-theme="light"] {
+  --background: oklch(0.97 0.004 160);
+  --foreground: oklch(0.12 0.01 160);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.12 0.01 160);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.12 0.01 160);
+  --secondary: oklch(0.93 0.005 160);
+  --secondary-foreground: oklch(0.2 0.01 160);
+  --muted: oklch(0.93 0.005 160);
+  --muted-foreground: oklch(0.45 0.01 160);
+  --accent: oklch(0.9 0.01 160);
+  --accent-foreground: oklch(0.12 0.01 160);
+  --border: oklch(0 0 0 / 10%);
+  --input: oklch(0 0 0 / 12%);
+  --ring: oklch(0.55 0.19 163);
+  --sidebar: oklch(0.93 0.005 160);
+  --sidebar-foreground: oklch(0.2 0.01 160);
+  --sidebar-accent: oklch(0.88 0.01 160);
+  --sidebar-accent-foreground: oklch(0.1 0.01 160);
+  --sidebar-border: oklch(0 0 0 / 10%);
+}
+
+[data-theme="light"] .glass {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+[data-theme="light"] .glass-strong {
+  background: rgba(0, 0, 0, 0.05);
+  border-color: rgba(0, 0, 0, 0.12);
+}
+[data-theme="light"] {
+  --color-white: oklch(0.15 0.01 160);
+  --color-black: oklch(0.97 0.004 160);
+}
+
+
 /* Custom utility classes */
 @layer utilities {
   .glass {
@@ -227,4 +292,36 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.2);
+}
+
+/* ── Keyframes (verify page & audit features) ─────────────────────────────── */
+
+/* Spinning dashed ring */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* High-risk ring pulse */
+@keyframes ringPulse {
+  0%, 100% { filter: drop-shadow(0 0 20px #ef444455); }
+  50% { filter: drop-shadow(0 0 50px #ef4444aa); }
+}
+
+/* Verdict fade-in */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Blinking cursor */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* Audit banner shimmer sweep */
+@keyframes shimmerSweep {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
