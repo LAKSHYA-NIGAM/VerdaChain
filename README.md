@@ -1,6 +1,6 @@
 # VerdaChain – The Carbon Credit Lie Detector
 
-**Live Demo:** [https://veda-chain.vercel.app](https://veda-chain.vercel.app) *(Update this link to your actual deployed URL if different)*
+**Live Demo:** [https://veda-chain-rosy.vercel.app/](https://veda-chain-rosy.vercel.app/)
 
 VerdaChain is a premium, full-stack SaaS application designed to verify carbon credits instantly using an AI-powered risk engine and blockchain-backed transparency. It helps investors and organizations detect carbon credit fraud and greenwashing before it hits the market.
 
