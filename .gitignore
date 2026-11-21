@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+*/node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -9,6 +10,23 @@
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
+
+# Python virtual environments & bytecode
+venv/
+*/venv/
+.venv/
+*/.venv/
+__pycache__/
+*/__pycache__/
+*/*/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+*.egg-info/
+dist/
+build/
 
 # testing
 /coverage
@@ -30,8 +48,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -39,5 +58,3 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-
-.vercel
