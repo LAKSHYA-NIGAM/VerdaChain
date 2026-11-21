@@ -8,7 +8,9 @@
 ![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![Ethereum](https://img.shields.io/badge/Ethereum-3C3C3D?style=for-the-badge&logo=ethereum&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/Neon_PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white)
-![Tailwind](https://img.shields.io/badge/Tailwind_CSS_4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)
+![Tailwind]
+[![CI](https://github.com/LAKSHYA-NIGAM/VerdaChain/actions/workflows/ci.yml/badge.svg)](https://github.com/LAKSHYA-NIGAM/VerdaChain/actions/workflows/ci.yml)
+(https://img.shields.io/badge/Tailwind_CSS_4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)
 
 **🏆 Hackstacy 2.0 Finalist — Top 12 out of 400+ teams**
 
@@ -44,6 +46,27 @@ Beautiful, interactive data visualizations built with **Recharts** and **shadcn/
 
 ### 🗄️ Serverless Database
 Uses **Neon Serverless PostgreSQL** with **Drizzle ORM** for robust, scalable data persistence with type-safe queries.
+
+---
+
+## 🧪 Automated Testing & Verification
+
+VerdaChain includes automated verification suites for the AI risk scoring engine, mock registry integrity, and credit fraud evaluation:
+
+```bash
+# Run backend verifier test suite
+python verdachain-backend/test_verifier.py
+
+# Or via npm
+npm test
+```
+
+### Test Coverage Highlights:
+- **Unknown Certificate Detection (`test_01`)**: Rejects unregistered credit certificates with a 95 risk score and `HIGH RISK` designation.
+- **Overissuance & Deforestation Detection (`test_02`)**: Detects credits exceeding baseline issuance (>150%) and flags severe deforestation (>20%).
+- **Clean Credit Verification (`test_03`)**: Validates genuine verified projects with 0 conflicts and awards `LOW RISK` status (score <= 30).
+- **Multi-Vector Conflict Scoring (`test_04`)**: Tests compound risk scenarios across cross-registry conflicts and issuer history flags.
+- **Registry Schema Integrity (`test_05`)**: Enforces required metadata schema across all registered credit assets.
 
 ---
 
